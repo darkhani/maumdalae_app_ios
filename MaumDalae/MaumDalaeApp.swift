@@ -8,6 +8,7 @@ struct MaumDalaeApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .preferredColorScheme(.light)
         }
     }
 }

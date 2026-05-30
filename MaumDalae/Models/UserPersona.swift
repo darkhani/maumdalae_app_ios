@@ -1,6 +1,6 @@
 import Foundation
 
-enum UserPersona: String, Codable, CaseIterable, Identifiable {
+enum UserPersona: String, Codable, CaseIterable, Identifiable, Hashable {
     case petLoss
     case senior
 

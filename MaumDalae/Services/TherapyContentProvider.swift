@@ -38,6 +38,11 @@ enum TherapyContentProvider {
         templates.filter { $0.persona == nil || $0.persona == persona }
     }
 
+    static func template(forTitle title: String, persona: UserPersona) -> TherapyTemplate {
+        templates(for: persona).first { $0.title == title }
+            ?? templates.first { $0.id == "free_sketch" }!
+    }
+
     static let htpDisclaimer = """
     본 HTP(집-나무-사람) 분석은 AI와 심리학적 이론을 바탕으로 한 참고용 가이드이며, \
     전문 정신과 의사나 임상심리사의 진단·치료를 대체할 수 없습니다. \

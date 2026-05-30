@@ -1,6 +1,6 @@
 import Foundation
 
-struct HTPAnalysis: Identifiable, Codable {
+struct HTPAnalysis: Identifiable, Codable, Hashable {
     let id: UUID
     let imageFileName: String
     let detectedObjects: [String: String]
@@ -11,13 +11,13 @@ struct HTPAnalysis: Identifiable, Codable {
     var showsCrisisAlert: Bool
 }
 
-struct StructuralFeatures: Codable {
+struct StructuralFeatures: Codable, Hashable {
     let position: String
     let pressure: String
     let lineQuality: String
 }
 
-struct SavedDrawing: Identifiable, Codable {
+struct SavedDrawing: Identifiable, Codable, Hashable {
     let id: UUID
     let persona: UserPersona
     let title: String

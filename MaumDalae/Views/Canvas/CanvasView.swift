@@ -4,6 +4,7 @@ import PencilKit
 struct CanvasView: View {
     let persona: UserPersona
     let template: TherapyTemplate
+    var existingDrawing: SavedDrawing? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var canvasView = PKCanvasView()
@@ -12,21 +13,32 @@ struct CanvasView: View {
     @State private var selectedColor: Color = .brown
     @State private var showSaveAlert = false
     @State private var saveMessage = ""
+    @State private var backgroundImage: UIImage?
 
     private var palette: PersonaPalette { AppTheme.palette(for: persona) }
+    private var isEditing: Bool { existingDrawing != nil }
 
-  var body: some View {
+    var body: some View {
         VStack(spacing: 0) {
             promptBanner
             ZStack {
+                Color.white
+                if let backgroundImage {
+                    Image(uiImage: backgroundImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                 DrawingCanvasRepresentable(canvasView: $canvasView, toolPicker: toolPicker)
-                TemplateGuideOverlay(templateId: template.id, palette: palette)
+                if !isEditing {
+                    TemplateGuideOverlay(templateId: template.id, palette: palette)
+                }
             }
             .background(Color.white)
             brushToolbar
             actionBar
         }
-        .navigationTitle(template.title)
+        .navigationTitle(isEditing ? "\(template.title) 편집" : template.title)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { setupCanvas() }
         .alert("저장", isPresented: $showSaveAlert) {
@@ -38,6 +50,11 @@ struct CanvasView: View {
 
     private var promptBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if isEditing {
+                Text("저장된 작품 위에 이어서 그릴 수 있어요.")
+                    .font(palette.usesHighContrast ? .title3 : .subheadline)
+                    .foregroundStyle(palette.accent)
+            }
             Text(template.prompt)
                 .font(palette.usesHighContrast ? .title3 : .subheadline)
                 .foregroundStyle(palette.text)
@@ -111,7 +128,11 @@ struct CanvasView: View {
 
             Spacer()
 
-            PrimaryButton(title: "작품 저장", palette: palette, icon: "square.and.arrow.down") {
+            PrimaryButton(
+                title: isEditing ? "변경 사항 저장" : "작품 저장",
+                palette: palette,
+                icon: "square.and.arrow.down"
+            ) {
                 saveDrawing()
             }
             .frame(maxWidth: 180)
@@ -121,8 +142,14 @@ struct CanvasView: View {
     }
 
     private func setupCanvas() {
+        if let existingDrawing,
+           let image = LocalStorageService.loadImage(fileName: existingDrawing.fileName) {
+            backgroundImage = image
+        }
         canvasView.drawingPolicy = .anyInput
-        canvasView.backgroundColor = .white
+        canvasView.isOpaque = false
+        canvasView.backgroundColor = .clear
+        canvasView.drawing = PKDrawing()
         canvasView.tool = selectedBrush.tool(color: UIColor(selectedColor))
         toolPicker.setVisible(true, forFirstResponder: canvasView)
         toolPicker.addObserver(canvasView)
@@ -134,28 +161,60 @@ struct CanvasView: View {
     }
 
     private func saveDrawing() {
-        let image = canvasView.drawing.image(
-            from: canvasView.bounds,
-            scale: UIScreen.main.scale
+        let bounds = canvasView.bounds
+        guard bounds.width > 0, bounds.height > 0 else {
+            saveMessage = "캔버스가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+            showSaveAlert = true
+            return
+        }
+
+        let scale = UIScreen.main.scale
+        let strokeImage = canvasView.drawing.image(from: bounds, scale: scale)
+        let finalImage = DrawingImageUtilities.compositeOnWhite(
+            background: backgroundImage,
+            strokes: strokeImage,
+            size: bounds.size,
+            scale: scale
         )
+
         do {
-            let id = UUID()
-            let fileName = try LocalStorageService.saveDrawing(image, id: id)
-            let saved = SavedDrawing(
-                id: id,
-                persona: persona,
-                title: template.title,
-                fileName: fileName,
-                createdAt: Date()
-            )
-            LocalStorageService.appendDrawing(saved)
-            saveMessage = "갤러리에 저장되었습니다."
+            if let existing = existingDrawing {
+                _ = try LocalStorageService.saveDrawing(
+                    finalImage,
+                    id: existing.id,
+                    fileName: existing.fileName
+                )
+                let updated = SavedDrawing(
+                    id: existing.id,
+                    persona: existing.persona,
+                    title: existing.title,
+                    fileName: existing.fileName,
+                    createdAt: Date()
+                )
+                LocalStorageService.updateDrawing(updated)
+                backgroundImage = finalImage
+                canvasView.drawing = PKDrawing()
+                saveMessage = "작품이 업데이트되었습니다."
+            } else {
+                let id = UUID()
+                let fileName = try LocalStorageService.saveDrawing(finalImage, id: id)
+                let saved = SavedDrawing(
+                    id: id,
+                    persona: persona,
+                    title: template.title,
+                    fileName: fileName,
+                    createdAt: Date()
+                )
+                LocalStorageService.appendDrawing(saved)
+                saveMessage = "갤러리에 저장되었습니다."
+            }
             showSaveAlert = true
         } catch {
             saveMessage = "저장에 실패했습니다. 다시 시도해 주세요."
             showSaveAlert = true
         }
     }
+
 }
 
 enum BrushStyle: String, CaseIterable, Identifiable {
@@ -235,8 +294,13 @@ struct DrawingCanvasRepresentable: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PKCanvasView {
         canvasView.drawingPolicy = .anyInput
+        canvasView.isOpaque = false
+        canvasView.backgroundColor = .clear
         return canvasView
     }
 
-    func updateUIView(_ uiView: PKCanvasView, context: Context) {}
+    func updateUIView(_ uiView: PKCanvasView, context: Context) {
+        uiView.isOpaque = false
+        uiView.backgroundColor = .clear
+    }
 }
