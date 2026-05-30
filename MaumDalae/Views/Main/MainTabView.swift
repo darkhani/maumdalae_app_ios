@@ -20,11 +20,17 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
+            CenterView(persona: persona)
+                .tabItem {
+                    Label("센터", systemImage: "mappin.and.ellipse")
+                }
+                .tag(2)
+
             SettingsView(persona: persona)
                 .tabItem {
                     Label("설정", systemImage: "gearshape.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(palette.primary)
     }

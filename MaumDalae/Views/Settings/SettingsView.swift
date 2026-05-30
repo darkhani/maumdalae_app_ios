@@ -44,14 +44,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Link(destination: URL(string: "tel://1393")!) {
-                        Label(TherapyContentProvider.crisisHotlineLabel, systemImage: "phone.fill")
-                    }
-                } header: {
-                    Text("위기 지원")
-                }
-
-                Section {
                     Button("여정 다시 선택", role: .destructive) {
                         appState.resetOnboarding()
                     }
